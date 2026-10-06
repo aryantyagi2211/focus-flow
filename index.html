@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10121a">
+  <title>Focus Flow — Pomodoro Timer</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #10121a;
+      color: #f4f5fb;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+      --muted: #9295a7;
+      --line: #292c39;
+      --panel: #181a25;
+      --accent: #a78bfa;
+      --accent-soft: #c4b5fd;
+      --green: #6ee7b7;
+    }
+    * { box-sizing: border-box; }
+    body { min-width: 320px; min-height: 100vh; margin: 0; background: radial-gradient(ellipse at 50% 7%, rgba(124, 92, 230, .13), transparent 42rem), #10121a; }
+    button, input { font: inherit; }
+    button { color: inherit; }
+    .app { width: min(100% - 40px, 560px); margin: 0 auto; padding: 42px 0 64px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 54px; }
+    .brand { display: flex; align-items: center; gap: 11px; font-size: 15px; font-weight: 700; letter-spacing: .01em; }
+    .brand-mark { display: grid; width: 32px; height: 32px; place-items: center; border: 1px solid rgba(196, 181, 253, .2); border-radius: 11px; background: rgba(167, 139, 250, .13); color: var(--accent-soft); }
+    .today-count { display: flex; align-items: center; gap: 8px; padding: 9px 13px; border: 1px solid var(--line); border-radius: 999px; background: rgba(24, 26, 37, .75); color: #d7d8e2; font-size: 12px; }
+    .count-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 12px rgba(110, 231, 183, .55); }
+    .count-number { color: var(--green); font-weight: 750; }
+    .timer-card { padding: 30px 24px 27px; border: 1px solid rgba(255, 255, 255, .07); border-radius: 28px; background: linear-gradient(145deg, rgba(27, 29, 42, .96), rgba(21, 23, 33, .96)); box-shadow: 0 24px 80px rgba(0, 0, 0, .24); text-align: center; }
+    .mode-switch { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid #303241; border-radius: 999px; background: #12141d; }
+    .mode-button { min-height: 36px; padding: 0 17px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); cursor: pointer; font-size: 12px; font-weight: 650; transition: background .2s, color .2s; }
+    .mode-button[aria-pressed="true"] { background: #30284a; color: #e3d9ff; }
+    .mode-button.break-active[aria-pressed="true"] { background: #203a35; color: #b7f7df; }
+    .timer-face { display: grid; width: min(100%, 310px); aspect-ratio: 1; margin: 19px auto 12px; place-items: center; border-radius: 50%; background: conic-gradient(var(--accent) var(--progress, 100%), #30313e 0); box-shadow: 0 0 50px rgba(167, 139, 250, .08); transition: background .35s ease; }
+    .timer-face.break-face { background: conic-gradient(var(--green) var(--progress, 100%), #30313e 0); }
+    .timer-inner { display: flex; width: calc(100% - 12px); height: calc(100% - 12px); flex-direction: column; align-items: center; justify-content: center; border: 1px solid rgba(255, 255, 255, .045); border-radius: 50%; background: #191b26; }
+    .timer-label { margin-bottom: 5px; color: var(--muted); font-size: 11px; font-weight: 650; letter-spacing: .16em; text-transform: uppercase; }
+    .time { font-variant-numeric: tabular-nums; font-size: clamp(64px, 15vw, 88px); font-weight: 650; letter-spacing: -.075em; line-height: 1.08; }
+    .timer-hint { min-height: 20px; margin: 0 0 23px; color: var(--muted); font-size: 13px; }
+    .controls { display: flex; justify-content: center; gap: 10px; }
+    .control-button { min-width: 112px; min-height: 46px; padding: 0 18px; border: 1px solid #343644; border-radius: 13px; background: #222431; color: #f1effa; cursor: pointer; font-size: 13px; font-weight: 700; transition: transform .15s, background .15s, border-color .15s; }
+    .control-button:hover:not(:disabled) { transform: translateY(-1px); background: #2a2c3b; }
+    .control-button:active:not(:disabled) { transform: translateY(0); }
+    .control-button:disabled { cursor: default; opacity: .42; }
+    .control-button.primary { border-color: transparent; background: var(--accent); color: #171320; }
+    .control-button.primary:hover:not(:disabled) { background: #b69bff; }
+    .break-theme .control-button.primary { background: var(--green); color: #10201b; }
+    .tasks-section { margin-top: 32px; }
+    .section-heading { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 13px; }
+    h1, h2, p { margin-top: 0; }
+    .section-heading h1 { margin-bottom: 0; font-size: 16px; letter-spacing: -.02em; }
+    .task-subtitle { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+    .task-total { color: var(--muted); font-size: 12px; }
+    .task-form { display: flex; gap: 9px; padding: 8px; border: 1px solid var(--line); border-radius: 15px; background: var(--panel); }
+    .task-input { width: 100%; min-width: 0; padding: 9px 8px; border: 0; outline: 0; background: transparent; color: #f4f5fb; font-size: 13px; }
+    .task-input::placeholder { color: #747789; }
+    .task-input:focus-visible { box-shadow: inset 0 -1px var(--accent); }
+    .add-button { flex: 0 0 auto; min-width: 72px; padding: 0 14px; border: 0; border-radius: 10px; background: #30284a; color: #ded3ff; cursor: pointer; font-size: 12px; font-weight: 700; }
+    .add-button:hover { background: #3b3159; }
+    .task-list { display: grid; gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; }
+    .task-item { display: flex; min-height: 54px; align-items: center; gap: 11px; padding: 9px 11px; border: 1px solid rgba(255, 255, 255, .055); border-radius: 13px; background: rgba(24, 26, 37, .72); }
+    .task-checkbox { width: 17px; height: 17px; flex: 0 0 auto; margin: 0; accent-color: var(--accent); cursor: pointer; }
+    .task-text { min-width: 0; flex: 1; overflow-wrap: anywhere; color: #e5e5ed; font-size: 13px; line-height: 1.45; }
+    .task-item.completed .task-text { color: #777b8d; text-decoration: line-through; }
+    .delete-button { display: grid; width: 32px; height: 32px; flex: 0 0 auto; place-items: center; border: 0; border-radius: 9px; background: transparent; color: #85899a; cursor: pointer; font-size: 18px; }
+    .delete-button:hover { background: rgba(248, 113, 113, .1); color: #fca5a5; }
+    .empty-state { padding: 22px 16px; border: 1px dashed #303241; border-radius: 13px; color: #85899a; font-size: 12px; text-align: center; }
+    button:focus-visible, input:focus-visible { outline: 2px solid var(--accent-soft); outline-offset: 3px; }
+    @media (max-width: 480px) { .app { width: min(100% - 28px, 560px); padding-top: 25px; } .topbar { margin-bottom: 30px; } .timer-card { padding: 24px 14px 21px; border-radius: 23px; } .timer-face { width: min(100%, 280px); margin-top: 15px; } .control-button { min-width: 0; flex: 1; } .tasks-section { margin-top: 26px; } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
+    :root { --bg: #11131b; --panel: #1a1c27; --line: #2c2f3d; --muted: #9397a9; --accent: #a78bfa; --green: #6ee7b7; }
+    body { min-height: 100dvh; background: radial-gradient(ellipse at 45% -20%, rgba(130, 105, 220, .16), transparent 44rem), var(--bg); }
+    .app { width: 100%; min-height: 100dvh; padding: 0; }
+    .topbar { position: sticky; z-index: 10; top: 0; min-height: 72px; margin: 0; padding: 0 clamp(16px, 3vw, 36px); border-bottom: 1px solid rgba(255, 255, 255, .06); background: rgba(17, 19, 27, .88); backdrop-filter: blur(18px); }
+    .header-left, .header-actions, .brand { display: flex; align-items: center; }
+    .header-left { gap: 14px; }
+    .header-actions { gap: 12px; }
+    .brand { gap: 11px; font-size: 15px; }
+    .brand-mark { width: 36px; height: 36px; border: 0; border-radius: 12px; background: linear-gradient(145deg, #b7a1ff, #8064e8); color: #181323; box-shadow: 0 6px 18px rgba(143, 112, 233, .24); }
+    .brand-mark svg { width: 21px; height: 21px; }
+    .icon-button { display: grid; width: 40px; height: 40px; flex: 0 0 auto; place-items: center; border: 1px solid var(--line); border-radius: 12px; background: #1a1c27; color: #d9d9e4; cursor: pointer; transition: background .15s, border-color .15s; }
+    .icon-button:hover { border-color: #474452; background: #232531; }
+    .icon-button svg { width: 18px; height: 18px; }
+    .today-count { padding: 9px 12px; }
+    .workspace { display: grid; grid-template-columns: minmax(0, 1fr) 310px; align-items: start; gap: clamp(20px, 3vw, 38px); width: min(100%, 1320px); margin: 0 auto; padding: 30px clamp(16px, 3vw, 36px) 48px; }
+    .primary-column { width: min(100%, 600px); margin: 0 auto; }
+    .page-intro { margin: 0 0 20px 3px; }
+    .page-intro h1 { margin: 0 0 5px; font-size: 23px; letter-spacing: -.045em; }
+    .page-intro p { margin: 0; color: var(--muted); font-size: 13px; }
+    .timer-card { padding: 30px 24px 27px; }
+    .timer-face { width: min(100%, 300px); }
+    .tasks-section { margin-top: 25px; }
+    .activity-sidebar { position: sticky; top: 96px; display: flex; height: calc(100dvh - 120px); min-height: 390px; flex-direction: column; overflow: hidden; border: 1px solid rgba(255, 255, 255, .07); border-radius: 20px; background: rgba(24, 26, 37, .88); }
+    .activity-heading { display: flex; min-height: 74px; align-items: center; justify-content: space-between; padding: 0 18px; border-bottom: 1px solid rgba(255, 255, 255, .06); }
+    .activity-title { display: flex; align-items: center; gap: 10px; }
+    .activity-title svg { width: 18px; height: 18px; color: var(--accent-soft); }
+    .activity-heading h2 { margin: 0; font-size: 14px; }
+    .activity-status { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 10px; }
+    .activity-status .count-dot { width: 6px; height: 6px; }
+    .activity-scroll { flex: 1; overflow: auto; overscroll-behavior: contain; padding: 17px 14px 20px; scrollbar-color: #3c3e4b transparent; scrollbar-width: thin; }
+    .activity-day { margin: 0 0 14px; color: #8e92a4; font-size: 10px; font-weight: 700; letter-spacing: .1em; text-align: center; text-transform: uppercase; }
+    .activity-message { display: flex; align-items: flex-start; gap: 9px; margin: 0 0 12px; animation: message-in .2s ease-out; }
+    @keyframes message-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    .activity-icon { display: grid; width: 27px; height: 27px; flex: 0 0 auto; place-items: center; border-radius: 9px; background: #2a2638; color: var(--accent-soft); font-size: 12px; }
+    .activity-message.session .activity-icon { background: #20332f; color: var(--green); }
+    .activity-message.deleted .activity-icon { background: #352729; color: #fda4af; }
+    .activity-bubble { min-width: 0; flex: 1; padding: 9px 11px 8px; border: 1px solid rgba(255, 255, 255, .045); border-radius: 4px 12px 12px; background: #20222e; color: #d9dae4; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+    .activity-time { display: block; margin-top: 5px; color: #85899a; font-size: 9px; }
+    .activity-empty { padding: 48px 12px; color: #8e92a4; font-size: 12px; line-height: 1.7; text-align: center; }
+    .activity-empty strong { display: block; margin-bottom: 5px; color: #d9dae4; font-size: 13px; }
+    .activity-scrim { display: none; }
+    .drawer-scrim { position: fixed; z-index: 19; inset: 0; visibility: hidden; background: rgba(4, 5, 9, .62); opacity: 0; transition: opacity .22s, visibility .22s; }
+    .nav-drawer { position: fixed; z-index: 20; inset: 0 auto 0 0; display: flex; width: min(290px, calc(100vw - 50px)); flex-direction: column; padding: 20px 16px; border-right: 1px solid var(--line); background: #181a25; box-shadow: 22px 0 70px rgba(0, 0, 0, .35); transform: translateX(-105%); transition: transform .24s ease; }
+    .drawer-open .drawer-scrim { visibility: visible; opacity: 1; }
+    .drawer-open .nav-drawer { transform: translateX(0); }
+    .drawer-header { display: flex; align-items: center; justify-content: space-between; padding: 2px 2px 25px; }
+    .drawer-nav { display: grid; gap: 7px; }
+    .nav-link { display: flex; min-height: 46px; align-items: center; gap: 12px; padding: 0 12px; border: 0; border-radius: 12px; background: transparent; color: #b8bac8; cursor: pointer; font-size: 13px; font-weight: 600; text-align: left; }
+    .nav-link svg { width: 18px; height: 18px; color: #a3a6b5; }
+    .nav-link:hover, .nav-link.active { background: #29263a; color: #e5dcff; }
+    .nav-link.active svg { color: var(--accent-soft); }
+    .drawer-footer { margin-top: auto; padding: 16px 12px 7px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; line-height: 1.6; }
+    .drawer-footer strong { display: block; margin-bottom: 4px; color: #e4e4ec; font-size: 12px; }
+    @media (max-width: 900px) { .workspace { grid-template-columns: minmax(0, 1fr) 280px; gap: 18px; } .timer-card { padding-inline: 18px; } }
+    @media (max-width: 720px) {
+      .topbar { min-height: 64px; padding-inline: 14px; }
+      .brand { gap: 8px; font-size: 14px; }
+      .brand-mark { width: 34px; height: 34px; }
+      .today-count { gap: 6px; padding: 8px 10px; font-size: 10px; }
+      .header-actions { gap: 8px; }
+      .icon-button { width: 38px; height: 38px; }
+      .workspace { display: block; padding: 26px 14px 40px; }
+      .primary-column { width: min(100%, 560px); }
+      .page-intro { margin-bottom: 17px; }
+      .page-intro h1 { font-size: 21px; }
+      .timer-card { padding: 25px 15px 21px; border-radius: 23px; }
+      .timer-face { width: min(100%, 275px); }
+      .control-button { min-width: 0; flex: 1; padding-inline: 10px; }
+      .tasks-section { margin-top: 24px; }
+      .activity-sidebar { position: fixed; z-index: 15; top: 0; right: 0; bottom: 0; width: min(360px, calc(100vw - 42px)); height: 100dvh; min-height: 0; border-radius: 20px 0 0 20px; box-shadow: -18px 0 60px rgba(0, 0, 0, .38); transform: translateX(105%); transition: transform .24s ease; }
+      .activity-open .activity-sidebar { transform: translateX(0); }
+      .activity-scrim { position: fixed; z-index: 14; inset: 0; display: block; visibility: hidden; background: rgba(4, 5, 9, .62); opacity: 0; transition: opacity .22s, visibility .22s; }
+      .activity-open .activity-scrim { visibility: visible; opacity: 1; }
+    }
+    @media (max-width: 360px) { .today-count { padding-inline: 8px; } .today-count > span:last-child { max-width: 90px; line-height: 1.2; } .mode-button { padding-inline: 12px; } }
+  </style>
+</head>
+<body>
+  <div class="drawer-scrim" id="drawer-scrim"></div>
+  <nav class="nav-drawer" id="nav-drawer" aria-label="Main navigation" aria-hidden="true">
+    <div class="drawer-header">
+      <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M9 2h6M12 2v3"/></svg></span><span>Focus Flow</span></div>
+      <button class="icon-button" id="drawer-close" type="button" aria-label="Close navigation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="drawer-nav">
+      <button class="nav-link active" id="nav-focus" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Focus timer</button>
+      <button class="nav-link" id="nav-tasks" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m3.5 6 .8.8L6 5M3.5 12l.8.8L6 11M3.5 18l.8.8L6 17"/></svg>My tasks</button>
+      <button class="nav-link" id="nav-activity" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v12H8l-4 3z"/><path d="M8 9h8M8 13h5"/></svg>Activity history</button>
+    </div>
+    <div class="drawer-footer"><strong>A little progress, every day.</strong>Your focus sessions and task activity stay saved on this device.</div>
+  </nav>
+  <main class="app">
+    <header class="topbar">
+      <div class="header-left">
+        <button class="icon-button" id="menu-toggle" type="button" aria-label="Open navigation" aria-controls="nav-drawer" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+        <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M9 2h6M12 2v3"/></svg></span><span>Focus Flow</span></div>
+      </div>
+      <div class="header-actions">
+        <div class="today-count" aria-live="polite"><span class="count-dot" aria-hidden="true"></span><span><span class="count-number" id="pomodoro-count">0</span> pomodoros today</span></div>
+        <button class="icon-button" id="activity-toggle" type="button" aria-label="Open activity history" aria-controls="activity-sidebar" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v12H8l-4 3z"/><path d="M8 9h8M8 13h5"/></svg></button>
+      </div>
+    </header>
+    <div class="workspace">
+      <div class="primary-column">
+        <div class="page-intro"><h1>Make room for focus.</h1><p>Settle in, take it one session at a time.</p></div>
+        <section class="timer-card" id="timer-card" aria-label="Pomodoro timer">
+          <div class="mode-switch" role="group" aria-label="Timer mode"><button class="mode-button" id="focus-mode" type="button" aria-pressed="true">Focus · 25 min</button><button class="mode-button break-active" id="break-mode" type="button" aria-pressed="false">Break · 5 min</button></div>
+          <div class="timer-face" id="timer-face" role="timer" aria-label="25 minutes 00 seconds remaining"><div class="timer-inner"><span class="timer-label" id="timer-label">Time to focus</span><time class="time" id="time-display">25:00</time></div></div>
+          <p class="timer-hint" id="timer-hint" aria-live="polite">One thing at a time. You’ve got this.</p>
+          <div class="controls"><button class="control-button primary" id="start-button" type="button">Start focus</button><button class="control-button" id="pause-button" type="button" disabled>Pause</button><button class="control-button" id="reset-button" type="button">Reset</button></div>
+        </section>
+        <section class="tasks-section" id="tasks-section" aria-labelledby="tasks-title">
+          <div class="section-heading"><div><h2 id="tasks-title">Your tasks</h2><p class="task-subtitle">Keep your next steps in sight.</p></div><span class="task-total" id="task-total">0 tasks</span></div>
+          <form class="task-form" id="task-form"><input class="task-input" id="task-input" type="text" maxlength="160" placeholder="What do you want to focus on?" aria-label="New task" autocomplete="off"><button class="add-button" type="submit">Add task</button></form>
+          <ul class="task-list" id="task-list" aria-label="Task list"></ul>
+        </section>
+      </div>
+      <div class="activity-scrim" id="activity-scrim"></div>
+      <aside class="activity-sidebar" id="activity-sidebar" aria-label="Task and session history">
+        <div class="activity-heading"><div class="activity-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v12H8l-4 3z"/><path d="M8 9h8M8 13h5"/></svg><h2>Activity</h2></div><span class="activity-status"><span class="count-dot"></span> Saved here</span></div>
+        <div class="activity-scroll" id="activity-scroll" aria-live="polite" aria-label="Recent activity"></div>
+      </aside>
+    </div>
+  </main>
+  <script>
+    (() => {
+      const STORAGE_KEY = "focus-flow-state-v1";
+      const FOCUS_SECONDS = 25 * 60;
+      const BREAK_SECONDS = 5 * 60;
+      const today = () => new Date().toLocaleDateString("en-CA");
+      const focusButton = document.getElementById("focus-mode");
+      const breakButton = document.getElementById("break-mode");
+      const timerFace = document.getElementById("timer-face");
+      const timerCard = document.getElementById("timer-card");
+      const timerLabel = document.getElementById("timer-label");
+      const timerDisplay = document.getElementById("time-display");
+      const timerHint = document.getElementById("timer-hint");
+      const startButton = document.getElementById("start-button");
+      const pauseButton = document.getElementById("pause-button");
+      const resetButton = document.getElementById("reset-button");
+      const countDisplay = document.getElementById("pomodoro-count");
+      const taskForm = document.getElementById("task-form");
+      const taskInput = document.getElementById("task-input");
+      const taskList = document.getElementById("task-list");
+      const taskTotal = document.getElementById("task-total");
+      const activityScroll = document.getElementById("activity-scroll");
+      const activityToggle = document.getElementById("activity-toggle");
+      const activityScrim = document.getElementById("activity-scrim");
+      const activitySidebar = document.getElementById("activity-sidebar");
+      const drawer = document.getElementById("nav-drawer");
+      const drawerScrim = document.getElementById("drawer-scrim");
+      const menuToggle = document.getElementById("menu-toggle");
+      const drawerClose = document.getElementById("drawer-close");
+      const navFocus = document.getElementById("nav-focus");
+      const navTasks = document.getElementById("nav-tasks");
+      const navActivity = document.getElementById("nav-activity");
+      function loadState() {
+        try {
+          const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+          return {
+            tasks: Array.isArray(saved.tasks) ? saved.tasks.filter(task => task && typeof task.id === "string" && typeof task.text === "string").map(task => ({ id: task.id, text: task.text, completed: Boolean(task.completed) })) : [],
+            activity: Array.isArray(saved.activity) ? saved.activity.filter(entry => entry && typeof entry.id === "string" && typeof entry.text === "string" && typeof entry.type === "string" && typeof entry.createdAt === "string" && !Number.isNaN(Date.parse(entry.createdAt))).slice(0, 100) : [],
+            completedToday: saved.date === today() && Number.isInteger(saved.completedToday) ? Math.max(0, saved.completedToday) : 0
+          };
+        } catch (error) {
+          console.error("Unable to read Focus Flow data from local storage.", error);
+          return { tasks: [], activity: [], completedToday: 0 };
+        }
+      }
+      const state = loadState();
+      let mode = "focus";
+      let remaining = FOCUS_SECONDS;
+      let timerId = null;
+      let endTime = null;
+      let running = false;
+      function saveState() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks: state.tasks, activity: state.activity, completedToday: state.completedToday, date: today() }));
+        } catch (error) {
+          console.error("Unable to save Focus Flow data to local storage.", error);
+          timerHint.textContent = "Could not save your changes. Check your browser storage settings.";
+        }
+      }
+      function durationForMode() { return mode === "focus" ? FOCUS_SECONDS : BREAK_SECONDS; }
+      function recordActivity(type, text) {
+        state.activity.unshift({ id: globalThis.crypto && typeof globalThis.crypto.randomUUID === "function" ? globalThis.crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`, type, text, createdAt: new Date().toISOString() });
+        state.activity = state.activity.slice(0, 100);
+        saveState();
+        renderActivity();
+      }
+      function renderActivity() {
+        activityScroll.replaceChildren();
+        if (state.activity.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "activity-empty";
+          const title = document.createElement("strong");
+          title.textContent = "Your story starts here";
+          const description = document.createElement("span");
+          description.textContent = "Add a task or finish a focus session to see it in your activity history.";
+          empty.append(title, description);
+          activityScroll.append(empty);
+          return;
+        }
+        let previousDay = "";
+        for (const entry of state.activity) {
+          const date = new Date(entry.createdAt);
+          const day = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+          if (day !== previousDay) {
+            const separator = document.createElement("p");
+            separator.className = "activity-day";
+            separator.textContent = day === new Date().toLocaleDateString("en-CA") ? "Today" : date.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
+            activityScroll.append(separator);
+            previousDay = day;
+          }
+          const message = document.createElement("div");
+          const category = entry.type === "focus" || entry.type === "break" ? "session" : entry.type;
+          message.className = `activity-message ${category}`;
+          const icon = document.createElement("span");
+          icon.className = "activity-icon";
+          icon.setAttribute("aria-hidden", "true");
+          icon.textContent = entry.type === "focus" ? "✓" : entry.type === "break" ? "☕" : entry.type === "deleted" ? "−" : entry.type === "completed" ? "✓" : entry.type === "reopened" ? "↺" : "+";
+          const bubble = document.createElement("div");
+          bubble.className = "activity-bubble";
+          bubble.textContent = entry.text;
+          const time = document.createElement("time");
+          time.className = "activity-time";
+          time.dateTime = entry.createdAt;
+          time.textContent = date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+          bubble.append(time);
+          message.append(icon, bubble);
+          activityScroll.append(message);
+        }
+      }
+      function renderTimer() {
+        const minutes = Math.floor(remaining / 60);
+        const seconds = remaining % 60;
+        const display = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+        timerDisplay.textContent = display;
+        timerFace.setAttribute("aria-label", `${minutes} minutes ${String(seconds).padStart(2, "0")} seconds remaining`);
+        timerFace.style.setProperty("--progress", `${(remaining / durationForMode()) * 100}%`);
+        countDisplay.textContent = state.completedToday;
+        const isBreak = mode === "break";
+        focusButton.setAttribute("aria-pressed", String(!isBreak));
+        breakButton.setAttribute("aria-pressed", String(isBreak));
+        timerFace.classList.toggle("break-face", isBreak);
+        timerCard.classList.toggle("break-theme", isBreak);
+        timerLabel.textContent = isBreak ? "Time to recharge" : "Time to focus";
+        startButton.textContent = running ? "Running" : `Start ${isBreak ? "break" : "focus"}`;
+        startButton.disabled = running;
+        pauseButton.disabled = !running;
+        if (!running) document.title = `${display} — Focus Flow`;
+      }
+      function completeSession() {
+        clearInterval(timerId);
+        timerId = null;
+        endTime = null;
+        running = false;
+        if (mode === "focus") {
+          state.completedToday += 1;
+          recordActivity("focus", "Focus session complete — one Pomodoro in the bank.");
+          mode = "break";
+          remaining = BREAK_SECONDS;
+          timerHint.textContent = "Focus session complete. Take a well-earned break.";
+        } else {
+          recordActivity("break", "Break complete. Ready to focus again.");
+          mode = "focus";
+          remaining = FOCUS_SECONDS;
+          timerHint.textContent = "Break’s over. Ready for another focus session?";
+        }
+        renderTimer();
+        renderTasks();
+      }
+      function tick() {
+        remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+        if (remaining === 0) { completeSession(); return; }
+        renderTimer();
+        if (running) document.title = `${timerDisplay.textContent} — Focus Flow`;
+      }
+      function startTimer() {
+        if (running) return;
+        running = true;
+        endTime = Date.now() + remaining * 1000;
+        timerHint.textContent = mode === "focus" ? "Stay with it. Every minute counts." : "Step away and let your mind reset.";
+        timerId = window.setInterval(tick, 250);
+        renderTimer();
+      }
+      function pauseTimer() {
+        if (!running) return;
+        remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+        clearInterval(timerId);
+        timerId = null;
+        endTime = null;
+        running = false;
+        timerHint.textContent = "Paused. Pick it back up whenever you’re ready.";
+        renderTimer();
+        if (remaining === 0) completeSession();
+      }
+      function resetTimer() {
+        clearInterval(timerId);
+        timerId = null;
+        endTime = null;
+        running = false;
+        remaining = durationForMode();
+        timerHint.textContent = "One thing at a time. You’ve got this.";
+        renderTimer();
+      }
+      function setMode(nextMode) {
+        if (mode === nextMode) return;
+        clearInterval(timerId);
+        timerId = null;
+        endTime = null;
+        running = false;
+        mode = nextMode;
+        remaining = durationForMode();
+        timerHint.textContent = nextMode === "focus" ? "One thing at a time. You’ve got this." : "A little rest helps you do your best.";
+        renderTimer();
+      }
+      function renderTasks() {
+        taskList.replaceChildren();
+        taskTotal.textContent = `${state.tasks.length} ${state.tasks.length === 1 ? "task" : "tasks"}`;
+        if (state.tasks.length === 0) {
+          const empty = document.createElement("li");
+          empty.className = "empty-state";
+          empty.textContent = "No tasks yet. Add one small thing to get started.";
+          taskList.append(empty);
+          return;
+        }
+        for (const task of state.tasks) {
+          const item = document.createElement("li");
+          item.className = `task-item${task.completed ? " completed" : ""}`;
+          const checkbox = document.createElement("input");
+          checkbox.className = "task-checkbox";
+          checkbox.type = "checkbox";
+          checkbox.checked = task.completed;
+          checkbox.setAttribute("aria-label", `Mark "${task.text}" ${task.completed ? "incomplete" : "complete"}`);
+          checkbox.addEventListener("change", () => {
+            task.completed = checkbox.checked;
+            recordActivity(task.completed ? "completed" : "reopened", task.completed ? `Completed task: ${task.text}` : `Reopened task: ${task.text}`);
+            renderTasks();
+          });
+          const text = document.createElement("span");
+          text.className = "task-text";
+          text.textContent = task.text;
+          const remove = document.createElement("button");
+          remove.className = "delete-button";
+          remove.type = "button";
+          remove.textContent = "×";
+          remove.setAttribute("aria-label", `Delete "${task.text}"`);
+          remove.addEventListener("click", () => {
+            state.tasks = state.tasks.filter(entry => entry.id !== task.id);
+            recordActivity("deleted", `Removed task: ${task.text}`);
+            renderTasks();
+          });
+          item.append(checkbox, text, remove);
+          taskList.append(item);
+        }
+      }
+      focusButton.addEventListener("click", () => setMode("focus"));
+      breakButton.addEventListener("click", () => setMode("break"));
+      startButton.addEventListener("click", startTimer);
+      pauseButton.addEventListener("click", pauseTimer);
+      resetButton.addEventListener("click", resetTimer);
+      function closeDrawer() {
+        const wasOpen = document.body.classList.contains("drawer-open");
+        document.body.classList.remove("drawer-open");
+        menuToggle.setAttribute("aria-expanded", "false");
+        drawer.setAttribute("aria-hidden", "true");
+        if (wasOpen) menuToggle.focus();
+      }
+      function syncActivityAccessibility() {
+        if (window.matchMedia("(max-width: 720px)").matches) activitySidebar.setAttribute("aria-hidden", String(!document.body.classList.contains("activity-open")));
+        else activitySidebar.removeAttribute("aria-hidden");
+      }
+      function closeActivity() {
+        document.body.classList.remove("activity-open");
+        activityToggle.setAttribute("aria-expanded", "false");
+        syncActivityAccessibility();
+      }
+      function openActivity() {
+        if (window.matchMedia("(max-width: 720px)").matches) {
+          document.body.classList.add("activity-open");
+          activityToggle.setAttribute("aria-expanded", "true");
+          syncActivityAccessibility();
+        } else activitySidebar.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      menuToggle.addEventListener("click", () => {
+        document.body.classList.add("drawer-open");
+        menuToggle.setAttribute("aria-expanded", "true");
+        drawer.setAttribute("aria-hidden", "false");
+        drawerClose.focus();
+      });
+      drawerClose.addEventListener("click", closeDrawer);
+      drawerScrim.addEventListener("click", closeDrawer);
+      activityToggle.addEventListener("click", openActivity);
+      activityScrim.addEventListener("click", closeActivity);
+      navFocus.addEventListener("click", () => { closeDrawer(); document.getElementById("timer-card").scrollIntoView({ behavior: "smooth", block: "center" }); });
+      navTasks.addEventListener("click", () => { closeDrawer(); document.getElementById("tasks-section").scrollIntoView({ behavior: "smooth", block: "start" }); taskInput.focus({ preventScroll: true }); });
+      navActivity.addEventListener("click", () => { closeDrawer(); openActivity(); });
+      document.addEventListener("keydown", event => { if (event.key === "Escape") { closeDrawer(); closeActivity(); } });
+      window.addEventListener("resize", syncActivityAccessibility);
+      taskForm.addEventListener("submit", event => {
+        event.preventDefault();
+        const text = taskInput.value.trim();
+        if (!text) { taskInput.focus(); return; }
+        state.tasks.push({ id: globalThis.crypto && typeof globalThis.crypto.randomUUID === "function" ? globalThis.crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`, text, completed: false });
+        recordActivity("added", `Added task: ${text}`);
+        taskInput.value = "";
+        renderTasks();
+        taskInput.focus();
+      });
+      renderTimer();
+      renderTasks();
+      renderActivity();
+      syncActivityAccessibility();
+    })();
+  </script>
+</body>
+</html>
